@@ -1,6 +1,11 @@
 Profundizar en el estado del arte
-Preparaci髇 de la estructura de la memoria del TFG
-Preparaci髇 de interfaz gr醘ica
-Preparaci髇 del dispositivo HMI
-Redacci髇 de la memoria del TFG
-Preparaci髇 de la presentaci髇
+
+Preparaci贸n de la estructura de la memoria del TFG
+
+Preparaci贸n de interfaz gr谩fica
+
+Preparaci贸n del dispositivo HMI
+
+Redacci贸n de la memoria del TFG
+
+Preparaci贸n de la presentaci贸n
