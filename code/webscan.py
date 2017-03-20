@@ -10,7 +10,7 @@ import os
 import subprocess
 
 # Variable declaration
-# Max number of children pages to scan (an higher number implies a slower but deeper scan)
+# Max number of children pages to scan (a higher number implies a slower but deeper scan)
 max_children = 3 
 
 # Starts OWASP ZAP
