@@ -3,129 +3,133 @@
 import time
 import os
 import subprocess
-import json
 
+import json
 from zapv2 import ZAPv2
 
-# Variable declaration
-# Max number of children pages to scan, 0 for all (a higher number implies a slower but deeper scan)
-max_children = 3
+max_children_pages_to_scan = 1  # 0 for all
+target_url = "http://localhost/mutillidae"
+#target_url = "http://www.example.com"
 
-# Starts OWASP ZAP
-# The '-daemon' switch makes it start in headless mode (without a graphical interface)
-# 'stdout=open(os.devnull,'w')' ensures there is no output in most operative systems
-print("Starting OWASP ZAP")
-subprocess.Popen(['/home/samuel/Escritorio/ZAP_2.5.0/zap.sh','-daemon'],stdout=open(os.devnull,'w'))
-time.sleep(5)
+def start_owasp():
+    print("Starting OWASP ZAP")
+    # The '-daemon' switch makes it start in headless mode (without a graphical interface)
+    # 'stdout=open(os.devnull,'w')' ensures there is no output in most operative systems
+    subprocess.Popen(['/home/samuel/Escritorio/ZAP_2.5.0/zap.sh','-daemon'],stdout=open(os.devnull,'w'))
+    return
 
-# Define the target URL
-target = 'http://localhost/mutillidae'
+def access_url(target_url):
+    print("Accessing target {}".format(target_url))
+    while True: # Will constantly try to connect until succesful
+        try:
+            time.sleep(2)
+            zap.urlopen(target_url)
+            # If unsuccesful, will throw an exception and retry
+            break
+        except:
+             pass
+    return
 
-# Start the ZAP API client (uses the default port 8080 and no API key)
-zap = ZAPv2()
-
-# Access the target URL
-print("Accessing target {}".format(target))
-while True: # Will constantly try to connect until succesful (until the program opens)
-    try:
-        time.sleep(2)         # Try to connect every 2 seconds
-        zap.urlopen(target)   # If unsuccesful, will throw an exception and retry
-        break
-    except:
-         pass
-
-
-
-# Starts the Spider process to fetch the site's pages
-print("Spidering target {}".format(target))
-scanid = zap.spider.scan(target, max_children)
-time.sleep(2)
-# The process continues until zap.spider.status() reaches 100, updating the status every 2 seconds
-while (int(zap.spider.status()) < 100):
-    print("Spider progress: " + zap.spider.status() + "%")
+# The 'spidering' process fetches the site's pages
+def spider_target(target_url, max_children_pages_to_scan):
+    print("Spidering target {}".format(target_url))
+    scanid = zap.spider.scan(target_url, max_children_pages_to_scan)
     time.sleep(2)
+    # The process continues until zap.spider.status() reaches 100, updating the status every 2 seconds
+    while (int(zap.spider.status()) < 100):
+        print("Spider progress: " + zap.spider.status() + "%")
+        time.sleep(2)
 
-# The spidering process ends
-print("Spider completed")
-time.sleep(5)
-
-# Starts the active scan
-print("Scanning target {}".format(target))
-scanid = zap.ascan.scan(target)
-# The process continues until zap.ascan.status() reaches 100, updating the status every 5 seconds
-while (int(zap.ascan.status(scanid)) < 100):
-    print("Scan progress: " + zap.ascan.status(scanid) + "%")
+    # The spidering process ends
+    print("Spider completed")
     time.sleep(5)
+    return
+    
+def active_scan_on_target(target_url):
+    print("Scanning target {}".format(target_url))
+    scanid = zap.ascan.scan(target_url)
+    # The process continues until zap.ascan.status() reaches 100, updating the status every 5 seconds
+    while (int(zap.ascan.status(scanid)) < 100):
+        print("Scan progress: " + zap.ascan.status(scanid) + "%")
+        time.sleep(5)
 
-# The scan ends
-print("Scan completed")
+    # The scan ends
+    print("Scan completed")
+    return
 
-# Report the results
-print("N of Alerts: " + zap.core.number_of_alerts())
-alerts = zap.core.alerts() # Saves the alerts as a list of dictionaries by default
+def save_results():
+    alerts = zap.core.alerts() # Saves the alerts as a list of dictionaries by default
+    return alerts
 
-# Output the alerts to a file
-f = open('/home/samuel/Escritorio/testreport','w')
-f.write(str(zap.core.alerts()))
-f.close()
-
-# Close OWASP ZAP
-print("Closing OWASP ZAP")
-zap.core.shutdown()
-
-
-print("Generating Report")
-
+def close_owasp():
+    print("Closing OWASP ZAP")
+    zap.core.shutdown()
+    return
 
 # Function to get data from the automated report and dump it into a list
-def get_data(target):
+def get_list_with_duplicates(tag, alerts):
     information = [] # Initialize the list
     for i in range(len(alerts)):
-        # For every element [i] of the list, get the element that corresponds to the specified
-        #'target' tag. It's necessary to convert it to string to remove the unicode tags
-        information.append(str(alerts[i][target])) # Create a list from these elements
+        # For every element [i] of the list, get the element that corresponds to the specified tag
+        information.append(alerts[i][tag]) # Create a list from these elements
     return information
 
-# Get data to later output it to the template
-# get_data("name") returns every property with the tag "name" in alerts
-# 'set' removes duplicates in a list. It also disorders them, so 'sorted' is used to solve this
-vulnerabilities = sorted(set(get_data("name")))
+def get_list_without_duplicates(tag, alerts):
+    info = get_list_with_duplicates(tag, alerts)
+    info = set(info)    # Removes the duplicates, but disorders the list
+    info = sorted(info) # Reorders the list
+    return info
 
-urls = sorted(set(get_data("url")))
+def get_variables(alerts):
+    vulnerabilities = get_list_without_duplicates("name", alerts)
+    urls = get_list_without_duplicates("url", alerts)
+    solutions = get_list_without_duplicates("solution", alerts)
 
-solutions = sorted(set(get_data("solution")))
+    risks = get_list_with_duplicates("risk", alerts)
+    n_of_low_risks = risks.count("Low")
+    n_of_medium_risks = risks.count("Medium")
+    n_of_high_risks = risks.count("High")
 
-risks = get_data("risk")
-n_of_low_risks = risks.count("Low")
-n_of_medium_risks = risks.count("Medium")
-n_of_high_risks = risks.count("High")
+    # Specify the variables to be sent to the book.json file
+    book_json_info = { "vulnerabilities" : vulnerabilities,
+                     "n_of_low_risks" : n_of_low_risks,
+                     "n_of_medium_risks" : n_of_medium_risks,
+                     "n_of_high_risks" : n_of_high_risks,
+                     "urls" : urls,
+                     "solutions" : solutions,
+                     "zap_version" : zap.core.version,
+                     "max_children" : max_children_pages_to_scan,
+                     "target_URL" : target_url,
+                     "n_of_vulnerabilities" : zap.core.number_of_alerts()}
+    return book_json_info
 
+def dump_variables(vars):
+    # The book.json file expects to find variables that follow this format:
+    #{
+    #    "variables": {
+    #        "variable_1": "Value 1",
+    #        "variable_2": "Value 2",
+    #        "variable_3": "Value 3"
+    #    }
+    #}
+    book_json_vars = { "variables": vars }
+    with open('/home/samuel/test-report-skeleton/book.json', 'w') as outfile:
+        json.dump(book_json_vars, outfile)
+    return
 
+def generate_report(alerts):
+    book_json_info = get_variables(alerts)
+    dump_variables(book_json_info)
+    return
 
-
-# Specify the variables to be sent to the book.json file
-templateVars = { "vulnerabilities" : vulnerabilities,
-                 "n_of_low_risks" : n_of_low_risks,
-                 "n_of_medium_risks" : n_of_medium_risks,
-                 "n_of_high_risks" : n_of_high_risks,
-                 "urls" : urls,
-                 "solutions" : solutions,
-                 "zap_version" : zap.core.version,
-                 "max_children" : max_children,
-                 "target_URL" : target,
-                 "n_of_vulnerabilities" : zap.core.number_of_alerts()}
-
-# The book.json file expects to find variables that follow this format:
-#{
-#    "variables": {
-#        "variable_1": "Value 1",
-#        "variable_2": "Value 2",
-#        "variable_3": "Value 3"
-#    }
-#}
-bookVars = { "variables": templateVars }
-
-# Send the variables to the book.json file (it is created if it doesn't exist)
-with open('/home/samuel/test-report-skeleton/book.json', 'w') as outfile:
-    json.dump(bookVars, outfile)
+#start_time = time.time()
+start_owasp()
+zap = ZAPv2() # Start the ZAP API client (with default port 8080 and no API key)
+access_url(target_url)
+spider_target(target_url, max_children_pages_to_scan)
+active_scan_on_target(target_url)
+alerts = save_results()
+close_owasp()
+#print(time.time() - start_time)
+generate_report(alerts)
 
