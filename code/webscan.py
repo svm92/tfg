@@ -18,7 +18,6 @@ def start_owasp():
     # The '-daemon' switch makes it start in headless mode (without a graphical interface)
     # 'stdout=open(os.devnull,'w')' ensures there is no output in most operative systems
     subprocess.Popen([owasp_location,"-daemon"],stdout=open(os.devnull,"w"))
-    return
 
 def access_url(target_url):
     print("Accessing {}".format(target_url))
@@ -33,17 +32,13 @@ def access_url(target_url):
         except:
             if (timeout_var >= 30): # If it can't connect after 1 minute, stop the script
                 stop_execution()
-            pass
-    return
 
 # Tries to close OWASP ZAP and then ends the script's execution
 def stop_execution():
     try:
         close_owasp()
-        return
     finally:
         raise SystemExit("Couldn't connect")
-    return
 
 # The 'spidering' process fetches the site's pages
 def spider_target(target_url, max_children_pages_to_scan):
@@ -58,7 +53,6 @@ def spider_target(target_url, max_children_pages_to_scan):
     # The spidering process ends
     print("Spider completed")
     time.sleep(5) # Time for the passive scan to finish
-    return
     
 def active_scan_on_target(target_url):
     print("Scanning {}".format(target_url))
@@ -70,7 +64,6 @@ def active_scan_on_target(target_url):
 
     # The scan ends
     print("Scan completed")
-    return
 
 def save_results():
     alerts = zap.core.alerts() # Saves the alerts as a list of dictionaries by default
@@ -79,12 +72,12 @@ def save_results():
 def close_owasp():
     print("Closing OWASP ZAP")
     zap.core.shutdown()
-    return
 
 def generate_report(alerts):
     book_json_info = get_variables(alerts)
     dump_variables(book_json_info)
-    return
+    os.chdir(os.path.dirname(book_json_location))
+    os.system('gitbook pdf . scan_report.pdf')
 
 def get_variables(alerts):
     vulnerabilities = get_list_without_duplicates("name", alerts)
@@ -135,7 +128,6 @@ def dump_variables(vars):
     book_json_vars = { "variables": vars }
     with open(book_json_location, "w") as outfile:
         json.dump(book_json_vars, outfile)
-    return
 
 
 start_owasp()
