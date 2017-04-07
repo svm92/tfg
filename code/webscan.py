@@ -7,7 +7,7 @@ import subprocess
 import json
 from zapv2 import ZAPv2
 
-max_children_pages_to_scan = 3  # 0 for all
+max_children_pages_to_scan = 1  # 0 for all
 target_url = "http://localhost/mutillidae"
 owasp_location = "/home/samuel/Escritorio/ZAP_2.5.0/zap.sh"
 book_json_location = "/home/samuel/test-report-skeleton/book.json"
@@ -74,12 +74,11 @@ def close_owasp():
     zap.core.shutdown()
 
 def generate_report(alerts):
-    book_json_info = get_variables(alerts)
+    book_json_info = get_variables(alerts, zap_version, n_of_alerts)
     dump_variables(book_json_info)
-    os.chdir(os.path.dirname(book_json_location))
-    os.system('gitbook pdf . scan_report.pdf')
+    create_pdf()
 
-def get_variables(alerts):
+def get_variables(alerts, zap_version, n_of_alerts):
     vulnerabilities = get_list_without_duplicates("name", alerts)
     urls = get_list_without_duplicates("url", alerts)
     solutions = get_list_without_duplicates("solution", alerts)
@@ -96,10 +95,10 @@ def get_variables(alerts):
                      "n_of_high_risks" : n_of_high_risks,
                      "urls" : urls,
                      "solutions" : solutions,
-                     "zap_version" : zap.core.version,
+                     "zap_version" : zap_version,
                      "max_children" : max_children_pages_to_scan,
                      "target_URL" : target_url,
-                     "n_of_vulnerabilities" : zap.core.number_of_alerts()}
+                     "n_of_vulnerabilities" : n_of_alerts}
     return book_json_info
 
 # Function to get data from the automated report and dump it into a list
@@ -129,13 +128,19 @@ def dump_variables(vars):
     with open(book_json_location, "w") as outfile:
         json.dump(book_json_vars, outfile)
 
+def create_pdf():
+    os.chdir(os.path.dirname(book_json_location))
+    os.system('gitbook pdf . scan_report.pdf')
 
-start_owasp()
-zap = ZAPv2() # Start the ZAP API client (with default port 8080 and no API key)
-access_url(target_url)
-spider_target(target_url, max_children_pages_to_scan)
-active_scan_on_target(target_url)
-alerts = save_results()
-close_owasp()
-generate_report(alerts)
+if __name__ == "__main__":
+    start_owasp()
+    zap = ZAPv2() # Start the ZAP API client (with default port 8080 and no API key)
+    access_url(target_url)
+    spider_target(target_url, max_children_pages_to_scan)
+    active_scan_on_target(target_url)
+    alerts = save_results()
+    zap_version = zap.core.version
+    n_of_alerts = zap.core.number_of_alerts()
+    close_owasp()
+    generate_report(alerts)
 
