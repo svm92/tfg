@@ -12,6 +12,8 @@ target_url = "http://localhost/mutillidae"
 owasp_location = "/home/samuel/Escritorio/ZAP_2.5.0/zap.sh"
 book_json_location = "/home/samuel/test-report-skeleton/book.json"
 
+# This is the API key for ZAP, found under Tools -> Options -> API. The API key is optional and can be disabled, but it's not recommended since it prevents malicious sites from accessing the ZAP API
+api_key = "3hf8lvqi3dqtau7dab20b292bq"
 
 def start_owasp():
     print("Opening OWASP ZAP")
@@ -81,8 +83,9 @@ def generate_report(alerts):
 def get_variables(alerts, zap_version, n_of_alerts):
     vulnerabilities = get_list_without_duplicates("name", alerts)
     urls = get_list_without_duplicates("url", alerts)
-    solutions = get_list_without_duplicates("solution", alerts)
-
+    solutions = get_associated_values(vulnerabilities, "solution", alerts)
+    descriptions = get_associated_values(vulnerabilities, "description", alerts)
+    
     risks = get_list_with_duplicates("risk", alerts)
     n_of_low_risks = risks.count("Low")
     n_of_medium_risks = risks.count("Medium")
@@ -95,6 +98,7 @@ def get_variables(alerts, zap_version, n_of_alerts):
                      "n_of_high_risks" : n_of_high_risks,
                      "urls" : urls,
                      "solutions" : solutions,
+                     "descriptions" : descriptions,
                      "zap_version" : zap_version,
                      "max_children" : max_children_pages_to_scan,
                      "target_URL" : target_url,
@@ -111,9 +115,20 @@ def get_list_with_duplicates(tag, alerts):
 
 def get_list_without_duplicates(tag, alerts):
     info = get_list_with_duplicates(tag, alerts)
-    info = set(info)    # Removes the duplicates, but disorders the list
-    info = sorted(info) # Reorders the list
+    info = set(info)    # Removes the duplicates by turning it into a set
+    info = list(info)   # Turns it back into a list
     return info
+
+# Function to get data that follows the same order as 'vulnerabilities', for ease of use
+def get_associated_values(vulnerabilities, tag, alerts):
+    vulnerabilities_with_duplicates = get_list_with_duplicates("name", alerts)
+    value_list = []
+    for i in range(len(vulnerabilities)):
+        # For every element, get the index of that element within 'vulnerabilities_with_duplicates'
+        index = vulnerabilities_with_duplicates.index(vulnerabilities[i])
+        # Use that index to find the associated value in 'alerts'
+        value_list.append(alerts[index][tag])
+    return value_list
 
 def dump_variables(vars):
     # The book.json file expects to find variables that follow this format:
@@ -134,7 +149,7 @@ def create_pdf():
 
 if __name__ == "__main__":
     start_owasp()
-    zap = ZAPv2() # Start the ZAP API client (with default port 8080 and no API key)
+    zap = ZAPv2(apikey=api_key) # Start the ZAP API client (with default port 8080)
     access_url(target_url)
     spider_target(target_url, max_children_pages_to_scan)
     active_scan_on_target(target_url)

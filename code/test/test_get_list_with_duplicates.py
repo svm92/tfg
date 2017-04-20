@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 import unittest
+import sys
+sys.path.insert(0, '..')
 import webscan
 
 sample_report = [{"risk" : "Low", "name" : "name1"} , {"risk" : "Low", "name" : "name2"} ,{"risk" : "High", "name" : "name3"}]
