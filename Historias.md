@@ -1,3 +1,4 @@
-Implementar el código en Raspberry Pi
-Ejecución automática del código tras el arranque
-Conectar Raspberry Pi a Internet
+Escanear puertos (nmap?)  
+Ampliar scan a todas las aplicaciones encontradas  
+Traducir informe a español?  
+  
