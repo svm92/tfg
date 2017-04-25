@@ -18,7 +18,7 @@ api_key = "3hf8lvqi3dqtau7dab20b292bq"
 def start_owasp():
     print("Opening OWASP ZAP")
     # The '-daemon' switch makes it start in headless mode (without a graphical interface)
-    # 'stdout=open(os.devnull,'w')' ensures there is no output in most operative systems
+    # 'stdout=open(os.devnull,'w')' ensures there is no output in most operating systems
     subprocess.Popen([owasp_location,"-daemon"],stdout=open(os.devnull,"w"))
 
 def access_url(target_url):
@@ -68,8 +68,7 @@ def active_scan_on_target(target_url):
     print("Scan completed")
 
 def save_results():
-    alerts = zap.core.alerts() # Saves the alerts as a list of dictionaries by default
-    return alerts
+    return zap.core.alerts() # Saves the alerts as a list of dictionaries by default
 
 def close_owasp():
     print("Closing OWASP ZAP")
@@ -107,28 +106,15 @@ def get_variables(alerts, zap_version, n_of_alerts):
 
 # Function to get data from the automated report and dump it into a list
 def get_list_with_duplicates(tag, alerts):
-    information = [] # Initialize the list
-    for i in range(len(alerts)):
-        # For every element [i] of the list, get the element that corresponds to the specified tag
-        information.append(alerts[i][tag]) # Create a list from these elements
-    return information
+    return [ alert[tag] for alert in alerts ]
 
 def get_list_without_duplicates(tag, alerts):
-    info = get_list_with_duplicates(tag, alerts)
-    info = set(info)    # Removes the duplicates by turning it into a set
-    info = list(info)   # Turns it back into a list
-    return info
+    return list(set(get_list_with_duplicates(tag, alerts)))
 
 # Function to get data that follows the same order as 'vulnerabilities', for ease of use
 def get_associated_values(vulnerabilities, tag, alerts):
     vulnerabilities_with_duplicates = get_list_with_duplicates("name", alerts)
-    value_list = []
-    for i in range(len(vulnerabilities)):
-        # For every element, get the index of that element within 'vulnerabilities_with_duplicates'
-        index = vulnerabilities_with_duplicates.index(vulnerabilities[i])
-        # Use that index to find the associated value in 'alerts'
-        value_list.append(alerts[index][tag])
-    return value_list
+    return [ alerts[vulnerabilities_with_duplicates.index(v)][tag] for v in vulnerabilities ]
 
 def dump_variables(vars):
     # The book.json file expects to find variables that follow this format:
