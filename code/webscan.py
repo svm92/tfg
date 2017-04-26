@@ -7,9 +7,9 @@ import subprocess
 import json
 from zapv2 import ZAPv2
 
-max_children_pages_to_scan = 1  # 0 for all
+max_children_pages_to_scan = 3  # 0 for all
 target_url = "http://localhost/mutillidae"
-owasp_location = "/home/samuel/Escritorio/ZAP_2.5.0/zap.sh"
+owasp_location = "/home/samuel/Escritorio/ZAP_2.6.0/zap.sh"
 book_json_location = "/home/samuel/test-report-skeleton/book.json"
 
 # This is the API key for ZAP, found under Tools -> Options -> API. The API key is optional and can be disabled, but it's not recommended since it prevents malicious sites from accessing the ZAP API
@@ -22,7 +22,7 @@ def start_owasp():
     subprocess.Popen([owasp_location,"-daemon"],stdout=open(os.devnull,"w"))
 
 def access_url(target_url):
-    print("Accessing {}".format(target_url))
+    print("Accessing " + target_url)
     timeout_var = 0
     while True: # Will constantly try to connect until succesful
         try:
@@ -44,7 +44,7 @@ def stop_execution():
 
 # The 'spidering' process fetches the site's pages
 def spider_target(target_url, max_children_pages_to_scan):
-    print("Spidering {}".format(target_url))
+    print("Spidering "+ target_url)
     scanid = zap.spider.scan(target_url, max_children_pages_to_scan)
     time.sleep(2) # Time for the spider to start
     # The process continues until zap.spider.status() reaches 100
@@ -57,7 +57,7 @@ def spider_target(target_url, max_children_pages_to_scan):
     time.sleep(5) # Time for the passive scan to finish
     
 def active_scan_on_target(target_url):
-    print("Scanning {}".format(target_url))
+    print("Scanning " + target_url)
     scanid = zap.ascan.scan(target_url)
     # The process continues until zap.ascan.status() reaches 100
     while (int(zap.ascan.status(scanid)) < 100):
@@ -81,7 +81,6 @@ def generate_report(alerts):
 
 def get_variables(alerts, zap_version, n_of_alerts):
     vulnerabilities = get_list_without_duplicates("name", alerts)
-    urls = get_list_without_duplicates("url", alerts)
     solutions = get_associated_values(vulnerabilities, "solution", alerts)
     descriptions = get_associated_values(vulnerabilities, "description", alerts)
     
@@ -95,7 +94,6 @@ def get_variables(alerts, zap_version, n_of_alerts):
                      "n_of_low_risks" : n_of_low_risks,
                      "n_of_medium_risks" : n_of_medium_risks,
                      "n_of_high_risks" : n_of_high_risks,
-                     "urls" : urls,
                      "solutions" : solutions,
                      "descriptions" : descriptions,
                      "zap_version" : zap_version,
