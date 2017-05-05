@@ -8,12 +8,22 @@ import json
 from zapv2 import ZAPv2
 
 max_children_pages_to_scan = 3  # 0 for all
-target_url = ["http://localhost/mutillidae", "http://localhost/dvwa"]
+target_url = "http://localhost/mutillidae"
 owasp_location = "/home/samuel/Escritorio/ZAP_2.5.0/zap.sh"
 book_json_location = "/home/samuel/test-report-skeleton/book.json"
 
 # This is the API key for ZAP, found under Tools -> Options -> API. The API key is optional and can be disabled, but it's not recommended since it prevents malicious sites from accessing the ZAP API
 api_key = "3hf8lvqi3dqtau7dab20b292bq"
+
+def get_name_servers(target_url):
+    dig = subprocess.Popen(["dig", target_url, "ns", "+short"], stdout=subprocess.PIPE)
+    name_servers = dig.stdout.read()    # Save the output from 'dig' as a string
+    name_servers = name_servers.split() # Split the string into a list
+    # Remove trailing dots
+    for i in range(len(name_servers)):
+        name_servers[i] = name_servers[i][:-1] # Take every element except for the last (the dot)
+    name_servers.append(target_url) # Add the orignal URL to the list of targets    
+    return name_servers
 
 def start_owasp():
     print("Opening OWASP ZAP")
@@ -42,11 +52,11 @@ def stop_execution():
     finally:
         raise SystemExit("Couldn't connect")
 
-def scan_with_zap(target_url):
-    for i in range(len(target_url)):
-        access_url(target_url[i])
-        spider_target(target_url[i], max_children_pages_to_scan)
-        active_scan_on_target(target_url[i])
+def scan_with_zap(list_of_targets):
+    for i in range(len(list_of_targets)):
+        access_url(list_of_targets[i])
+        spider_target(list_of_targets[i], max_children_pages_to_scan)
+        active_scan_on_target(list_of_targets[i])
 
 # The 'spidering' process fetches the site's pages
 def spider_target(target_url, max_children_pages_to_scan):
@@ -105,7 +115,7 @@ def get_variables(alerts, zap_version, n_of_alerts):
                      "descriptions" : descriptions,
                      "zap_version" : zap_version,
                      "max_children" : max_children_pages_to_scan,
-                     "target_URL" : target_url,
+                     "target_URL" : list_of_targets,
                      "urls" : urls,
                      "n_of_vulnerabilities" : n_of_alerts}
     return book_json_info
@@ -150,9 +160,10 @@ def create_pdf():
     os.system('gitbook pdf . scan_report.pdf')
 
 if __name__ == "__main__":
+    list_of_targets = get_name_servers(target_url)
     start_owasp()
     zap = ZAPv2(apikey=api_key) # Start the ZAP API client (with default port 8080)
-    scan_with_zap(target_url)    
+    scan_with_zap(list_of_targets)    
     alerts = save_results()
     zap_version = zap.core.version
     n_of_alerts = zap.core.number_of_alerts()
