@@ -5,25 +5,59 @@ import os
 import subprocess
 
 import json
+import nmap
 from zapv2 import ZAPv2
 
-max_children_pages_to_scan = 3  # 0 for all
-target_url = "http://localhost/mutillidae"
+max_children_pages_to_scan = 1  # 0 for all
+target_url = "http://localhost"
 owasp_location = "/home/samuel/Escritorio/ZAP_2.5.0/zap.sh"
 book_json_location = "/home/samuel/test-report-skeleton/book.json"
 
 # This is the API key for ZAP, found under Tools -> Options -> API. The API key is optional and can be disabled, but it's not recommended since it prevents malicious sites from accessing the ZAP API
 api_key = "3hf8lvqi3dqtau7dab20b292bq"
 
-def get_name_servers(target_url):
-    dig = subprocess.Popen(["dig", target_url, "ns", "+short"], stdout=subprocess.PIPE)
-    name_servers = dig.stdout.read()    # Save the output from 'dig' as a string
-    name_servers = name_servers.split() # Split the string into a list
-    # Remove trailing dots
-    for i in range(len(name_servers)):
-        name_servers[i] = name_servers[i][:-1] # Take every element except for the last (the dot)
-    name_servers.append(target_url) # Add the orignal URL to the list of targets    
-    return name_servers
+# Function to remove the "http://" at the beginning of a URL (needed for nmap)
+def remove_http_from_url(url):
+    if url.startswith("http://"):
+        return url[7:]
+    return url
+
+# Function to add the "http://" at the beginning of a URL (needed for OWASP ZAP)
+def add_http_to_url(url):
+    if not url.startswith("http://"):
+        return "http://" + url
+    return url
+
+def find_live_hosts(target_url):
+    print("Finding live hosts")
+    nm = nmap.PortScanner()
+    target_url = remove_http_from_url(target_url) # Removes the "http://" at the beginning (needed for nmap)
+    host_range = target_url + "/24"
+    nm.scan(hosts=host_range, arguments="-sn") # The "-sn" switch is used to find live hosts
+    live_hosts = []
+    for host in nm.all_hosts():
+        if (nm[host].state() == "up"):
+            live_hosts.append(host)
+    return live_hosts
+
+def find_open_ports(list_of_targets):
+    list_of_ports = []
+    for i in range(len(list_of_targets)):
+        list_of_ports.append( scan_ports(list_of_targets[i]) )
+    return list_of_ports
+
+def scan_ports(host):
+    print("Scanning ports for " + host)
+    nm = nmap.PortScanner()
+    host = remove_http_from_url(host) # Removes the "http://" at the beginning (needed for nmap)
+    nm.scan(host)
+    host = nm.all_hosts()[0] # Gets the IP of the host (needed for nmap)
+    ports_with_apps = []
+    if "tcp" in nm[host]: # If any open ports were found        
+        for port in nm[host]["tcp"]: # Get all ports with a "http" service or a "ssl" (https) service
+            if (nm[host]["tcp"][port]["name"] == "http" or nm[host]["tcp"][port]["name"] == "ssl"):
+                ports_with_apps.append(port)
+    return ports_with_apps
 
 def start_owasp():
     print("Opening OWASP ZAP")
@@ -52,11 +86,18 @@ def stop_execution():
     finally:
         raise SystemExit("Couldn't connect")
 
-def scan_with_zap(list_of_targets):
+def scan_with_zap(list_of_targets, list_of_ports):
     for i in range(len(list_of_targets)):
-        access_url(list_of_targets[i])
-        spider_target(list_of_targets[i], max_children_pages_to_scan)
-        active_scan_on_target(list_of_targets[i])
+        if list_of_ports[i]: # If any ports were found for that URL (non-empty list)
+            for j in range(len(list_of_ports[i])):
+                    if (list_of_ports[i][j] == 80): #For any port other than 80, add :port to the URL
+                        target_url = list_of_targets[i]
+                    else:
+                        target_url = list_of_targets[i] + ":" + str(list_of_ports[i][j])
+                    target_url = add_http_to_url(target_url) # OWASP needs an explicit "http://" in the URL
+                    access_url(target_url)
+                    spider_target(target_url, max_children_pages_to_scan)
+                    active_scan_on_target(target_url)
 
 # The 'spidering' process fetches the site's pages
 def spider_target(target_url, max_children_pages_to_scan):
@@ -160,10 +201,11 @@ def create_pdf():
     os.system('gitbook pdf . scan_report.pdf')
 
 if __name__ == "__main__":
-    list_of_targets = get_name_servers(target_url)
+    list_of_targets = find_live_hosts(target_url)
+    list_of_ports = find_open_ports(list_of_targets)
     start_owasp()
     zap = ZAPv2(apikey=api_key) # Start the ZAP API client (with default port 8080)
-    scan_with_zap(list_of_targets)    
+    scan_with_zap(list_of_targets, list_of_ports)    
     alerts = save_results()
     zap_version = zap.core.version
     n_of_alerts = zap.core.number_of_alerts()
