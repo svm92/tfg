@@ -9,17 +9,20 @@ import nmap
 from zapv2 import ZAPv2
 
 max_children_pages_to_scan = 1  # 0 for all
-target_url = "http://localhost"
+target_url = "http://127.0.0.1"#"http://localhost"
 owasp_location = "/home/samuel/Escritorio/ZAP_2.5.0/zap.sh"
 book_json_location = "/home/samuel/test-report-skeleton/book.json"
 
 # This is the API key for ZAP, found under Tools -> Options -> API. The API key is optional and can be disabled, but it's not recommended since it prevents malicious sites from accessing the ZAP API
 api_key = "3hf8lvqi3dqtau7dab20b292bq"
 
-# Function to remove the "http://" at the beginning of a URL (needed for nmap)
-def extract_host_from_url(url):
-    from urllib.parse import urlparse
-    return urlparse(url).hostname
+# Function to remove the scheme at the beginning of a URL (needed for nmap)
+def remove_scheme(url):
+    try:
+        from urllib.parse import urlparse # Python 3 
+    except ImportError:
+        from urlparse import urlparse     # Python 2
+    return urlparse(url).geturl().replace(urlparse(url).scheme + "://", "", 1)
 
 # Function to add the "http://" at the beginning of a URL (needed for OWASP ZAP)
 def add_http_to_url(url):
@@ -30,7 +33,7 @@ def add_http_to_url(url):
 def find_live_hosts(target_url):
     print("Finding live hosts")
     nm = nmap.PortScanner()
-    target_url = extract_host_from_url(target_url) # Removes the "http://" at the beginning (needed for nmap)
+    target_url = remove_scheme(target_url) # Needed for nmap
     host_range = target_url + "/24"
     nm.scan(hosts=host_range, arguments="-sn") # The "-sn" switch is used to find live hosts
     live_hosts = []
@@ -48,13 +51,12 @@ def find_open_ports(list_of_targets):
 def scan_ports(host):
     print("Scanning ports for " + host)
     nm = nmap.PortScanner()
-    host = extract_host_from_url(host) # Removes the "http://" at the beginning (needed for nmap)
-    nm.scan(host)
-    host = nm.all_hosts()[0] # Gets the IP of the host (needed for nmap)
+    scan_results = nm.scan(host)
+    scan_results = scan_results["scan"][host] # Extract the section of interest within the results
     ports_with_apps = []
-    if "tcp" in nm[host]: # If any open ports were found        
-        for port in nm[host]["tcp"]: # Get all ports with a "http" service or a "ssl" (https) service
-            if (nm[host]["tcp"][port]["name"] == "http" or nm[host]["tcp"][port]["name"] == "ssl"):
+    if "tcp" in scan_results: # If any open ports were found    
+        for port in scan_results["tcp"]: # Get all ports with a "http" service or a "ssl" (https) service
+            if (scan_results["tcp"][port]["name"] == "http" or scan_results["tcp"][port]["name"] == "ssl"):
                 ports_with_apps.append(port)
     return ports_with_apps
 
@@ -65,6 +67,7 @@ class OWASP(object):
         # 'stdout=open(os.devnull,'w')' ensures there is no output in most operating systems
         self.pid = subprocess.Popen([owasp_location,"-daemon"], stdout=open(os.devnull,"w"))
         self.zap = ZAPv2(apikey=api_key) # Start the ZAP API client (with default port 8080)
+        return self
 
     # Tries to close OWASP ZAP and then ends the script's execution
     def __exit__(self, type, value, traceback):
@@ -94,8 +97,9 @@ class OWASP(object):
                 self.zap.urlopen(target_url)
                 # If unsuccesful, will throw an exception and retry
                 break
-            except e:
+            except Exception as e:
                 if (timeout_var >= 30): # If it can't connect after 1 minute, stop the script
+                    #print e.message; raise SystemExit("Couldn't connect")#raise e
                     raise e
 
     # The 'spidering' process fetches the site's pages
@@ -204,8 +208,12 @@ def create_pdf():
 
 if __name__ == "__main__":
     list_of_targets = find_live_hosts(target_url)
+    print(list_of_targets)
+    #list_of_targets = ["127.0.0.1"]
+    #list_of_ports = [[80]]
     list_of_ports = find_open_ports(list_of_targets)
-    with OWASP() as owasp:
-        owasp.scan(list_of_targets, list_of_ports)
-        generate_report(owasp.results(), owasp.version())
+    print(list_of_ports)
+    with OWASP() as owasp_instance:
+        owasp_instance.scan(list_of_targets, list_of_ports)
+        generate_report(owasp_instance.results(), owasp_instance.version())
 
