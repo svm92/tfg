@@ -5,31 +5,17 @@ from unittest.mock import patch
 import sys
 sys.path.insert(0, '..')
 import webscan
-import nmap
 
-def mock_hosts():
-    return ["127.0.0.1", "127.0.0.2", "127.0.0.3"]
+def mock_scan(cidr):
+    if cidr == "127.0.0.1/8":
+        return ["127.0.0.1", "127.0.0.2"]
+    if cidr == "10.0.2.15/24":
+        return ["10.0.2.15"]
 
-def mock_getitem(host):
-    return nmap.PortScannerHostDict
-
-def mock_state_up():
-    return "up"
-
-def mock_state_down():
-    return "down"
-
-@patch("nmap.PortScanner.scan")
-@patch("nmap.PortScanner.all_hosts", side_effect=mock_hosts)        
-@patch("nmap.PortScanner.__getitem__", side_effect=mock_getitem) 
 class Test(unittest.TestCase):
-    @patch("nmap.PortScannerHostDict.state", side_effect=mock_state_up) 
-    def test_find_live_hosts(self, mock_scan, mock_hosts, mock_getitem, mock_state_up):
-        self.assertEqual(webscan.find_live_hosts("127.0.0.1"), ["127.0.0.1", "127.0.0.2", "127.0.0.3"])
-
-    @patch("nmap.PortScannerHostDict.state", side_effect=mock_state_down) 
-    def test_find_live_hosts_down(self, mock_scan, mock_hosts, mock_getitem, mock_state_down):
-        self.assertEqual(webscan.find_live_hosts("127.0.0.1"), [])
+    @patch("webscan.scan_hosts", side_effect=mock_scan)
+    def test_find_live_hosts(self, mock_scan):
+        self.assertEqual(webscan.find_live_hosts(["127.0.0.1/8", "10.0.2.15/24"]), ["127.0.0.1", "127.0.0.2", "10.0.2.15"])
 
 if __name__ == '__main__':
     unittest.main()
