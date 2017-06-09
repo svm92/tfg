@@ -54,12 +54,6 @@ def get_cidr(interface):
     logger.debug("CIDR found: " + str(cidr))
     return str(cidr)
 
-# Function to add the "http://" at the beginning of a URL (needed for OWASP ZAP)
-def add_http_to_url(url):
-    if not url.startswith("http://"):
-        return "http://" + url
-    return url
-
 def find_live_hosts(cidr_list):
     live_hosts = []
     for cidr in cidr_list:       
@@ -80,34 +74,33 @@ def scan_hosts(cidr):
     return live_hosts
 
 def find_open_ports(list_of_targets):
-    list_of_ports = []
+    list_of_urls = []
     for i in range(len(list_of_targets)):
-        list_of_ports.append( scan_ports(list_of_targets[i]) )
-    logger.info("List of ports with potential web applications: " + str(list_of_ports))
-    return list_of_ports
+        list_of_urls.extend( scan_ports(list_of_targets[i]) )
+    logger.info("List of URLs with potential web applications: " + str(list_of_urls))
+    return list_of_urls
 
-def scan_ports(host):
-    logger.info("Scanning ports for " + host)
+def scan_ports(ip):
+    logger.info("Scanning ports for " + ip)
     nm = nmap.PortScanner()
-    scan_results = nm.scan(host)
-    scan_results = scan_results["scan"][host] # Extract the section of interest within the results
-    logger.debug("Port scan results for " + str(host) + ": " + str(scan_results))
-    ports_with_apps = []
+    scan_results = nm.scan(ip)
+    scan_results = scan_results["scan"][ip] # Extract the section of interest within the results
+    logger.debug("Port scan results for " + str(ip) + ": " + str(scan_results))
+    list_of_urls = []
     if "tcp" in scan_results: # If any open ports were found    
-        for port in scan_results["tcp"]: # Get all ports with a "http" service or a "ssl" (https) service
-            if (scan_results["tcp"][port]["name"] == "http" or scan_results["tcp"][port]["name"] == "ssl" or scan_results["tcp"][port]["name"] == "ssl/http"):
-                ports_with_apps.append(port)
-    logger.debug("Ports with applications in " + str(host) + ": " + str(ports_with_apps))
-    return ports_with_apps
+        for port in scan_results["tcp"]: # Get all ports with a http or ssl (https) service
+            service = scan_results["tcp"][port]["name"]
+            if service in ("http", "ssl", "ssl/http"):
+                list_of_urls.append(find_scheme(service) + ip + ":" + str(port))
+    logger.debug("The following URLs were found to potentially have web applications: " + str(list_of_urls))
+    return list_of_urls
 
-def remove_targets_without_ports(list_of_targets, list_of_ports):
-    clean_list_of_targets = []
-    clean_list_of_ports = []
-    for i in range(len(list_of_targets)):
-        if list_of_ports[i]: # If any ports were found for that URL (non-empty list)
-            clean_list_of_targets.append( list_of_targets[i] )
-            clean_list_of_ports.append( list_of_ports[i] )
-    return clean_list_of_targets, clean_list_of_ports
+def find_scheme(service):
+    if service == "https" or service == "ssl" or service == "ssl/http":
+        return "https://"
+    else:
+        return "http://"
+
 
 class OWASP(object):
     def __enter__(self):
@@ -123,17 +116,11 @@ class OWASP(object):
         logger.info("Closing OWASP ZAP")
         self.zap.core.shutdown()
 
-    def scan(self, list_of_targets, list_of_ports):
-        for i in range(len(list_of_targets)):
-            for j in range(len(list_of_ports[i])):
-                if (list_of_ports[i][j] == 80): #For any port other than 80, add :port to the URL
-                    target_url = list_of_targets[i]
-                else:
-                    target_url = list_of_targets[i] + ":" + str(list_of_ports[i][j])
-                target_url = add_http_to_url(target_url) # OWASP needs an explicit "http://" in the URL
-                self.access_url(target_url)
-                self.spider_target(target_url, max_children_pages_to_scan)
-                self.active_scan(target_url)
+    def scan(self, list_of_urls):
+        for target_url in list_of_urls:
+            self.access_url(target_url)
+            self.spider_target(target_url, max_children_pages_to_scan)
+            self.active_scan(target_url)
 
     def access_url(self, target_url):
         logger.info("Accessing " + target_url)
@@ -147,7 +134,7 @@ class OWASP(object):
                 break
             except Exception as e:
                 if (timeout_var >= 30): # If it can't connect after 1 minute, stop the script
-                    logger.warn("Couldn't connect to " + target_url)
+                    logger.exception("Couldn't connect to " + target_url)
                     raise e
 
     # The 'spidering' process fetches the site's pages
@@ -194,7 +181,7 @@ def get_variables(alerts, zap_version):
     vulnerabilities = get_list_without_duplicates("name", alerts)
     solutions = get_associated_values(vulnerabilities, "solution", alerts)
     descriptions = get_associated_values(vulnerabilities, "description", alerts)
-    urls = get_urls(vulnerabilities, alerts)    
+    affected_urls = get_urls(vulnerabilities, alerts)    
 
     risks = get_list_with_duplicates("risk", alerts)
     n_of_low_risks = risks.count("Low")
@@ -210,8 +197,8 @@ def get_variables(alerts, zap_version):
                      "descriptions" : descriptions,
                      "zap_version" : zap_version,
                      "max_children" : max_children_pages_to_scan,
-                     "target_URL" : list_of_targets,
-                     "urls" : urls,
+                     "target_URL" : list_of_urls,
+                     "urls" : affected_urls,
                      "n_of_vulnerabilities" : len(alerts)}
     logger.debug("Collecting variables:" + str(book_json_info))
     return book_json_info
@@ -266,9 +253,8 @@ if __name__ == "__main__":
     logger = initialize_log_handling()
     cidr_list = find_all_cidrs()
     list_of_targets = find_live_hosts(cidr_list)
-    list_of_ports = find_open_ports(list_of_targets)
-    list_of_targets, list_of_ports = remove_targets_without_ports(list_of_targets, list_of_ports)
+    list_of_urls = find_open_ports(list_of_targets)
     with OWASP() as owasp_instance:
-        owasp_instance.scan(list_of_targets, list_of_ports)
+        owasp_instance.scan(list_of_urls)
         generate_report(owasp_instance.results(), owasp_instance.version())
 

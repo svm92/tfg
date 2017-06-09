@@ -7,7 +7,7 @@ import webscan
 
 zap_version = "2.5.0"
 webscan.max_children_pages_to_scan = 3
-webscan.list_of_targets = "foo"
+webscan.list_of_urls = "foo"
 sample_report = [{"name" : "a", "solution" : "b", "description" : "c", "risk" : "Low", "url" : "d"}, {"name" : "e", "solution" : "f", "description" : "g", "risk" : "High", "url" : "h"}]
 
 

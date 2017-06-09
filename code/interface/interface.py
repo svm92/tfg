@@ -19,6 +19,7 @@ def quit_program():
 def button(message,x,y,width,height,default_color,hover_color,action=None):
     mouse = pygame.mouse.get_pos()
     click = pygame.mouse.get_pressed()
+    # If the mouse is hovering over the button:
     if x+width > mouse[0] > x and y+height > mouse[1] > y:
         pygame.draw.rect(programDisplay, hover_color,(x,y,width,height))
         if click[0] == 1 and action != None:

@@ -1,0 +1,12 @@
+2017-06-09 15:13:04,977 : [DEBUG] - Interfaces found: ['lo', 'enp0s3']
+2017-06-09 15:13:04,978 : [DEBUG] - Finding CIDR for enp0s3
+2017-06-09 15:13:04,978 : [DEBUG] - CIDR found: 10.0.2.15/24
+2017-06-09 15:13:04,979 : [INFO] - List of CIDRs: ['10.0.2.15/24']
+2017-06-09 15:13:04,979 : [INFO] - Finding live hosts for 10.0.2.15/24
+2017-06-09 15:13:27,205 : [DEBUG] - Hosts found: ['10.0.2.15', '10.0.2.2', '10.0.2.3', '10.0.2.4']
+2017-06-09 15:13:27,208 : [DEBUG] - Hosts up: ['10.0.2.15', '10.0.2.2', '10.0.2.3', '10.0.2.4']
+2017-06-09 15:13:27,209 : [INFO] - List of live hosts: ['10.0.2.15', '10.0.2.2', '10.0.2.3', '10.0.2.4']
+2017-06-09 15:13:27,210 : [INFO] - Scanning ports for 10.0.2.15
+2017-06-09 15:13:28,846 : [DEBUG] - Port scan results for 10.0.2.15: {'addresses': {'ipv4': '10.0.2.15'}, 'status': {'reason': 'conn-refused', 'state': 'up'}, 'vendor': {}, 'hostnames': [{'type': '', 'name': ''}]}
+2017-06-09 15:13:28,846 : [DEBUG] - The following URLs were found to potentially have web applications: []
+2017-06-09 15:13:28,847 : [INFO] - Scanning ports for 10.0.2.2
