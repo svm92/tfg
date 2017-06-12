@@ -11,6 +11,9 @@ white = (255,255,255)
 gray = (125,125,125)
 light_gray = (150,150,150)
 
+webscan_directory = "/home/samuel/tfg/code/webscan.py"
+#webscan_directory = "/home/pi/tfg/code/webscan.py"
+
 def quit_program():
     pygame.display.quit()
     pygame.quit()
@@ -52,7 +55,7 @@ def program_start():
         clock.tick(15)
         
 def launch_scan():
-    subprocess.call(["gnome-terminal", "-x", "/home/samuel/tfg/code/webscan.py"])
+    subprocess.call(["gnome-terminal", "-x", webscan_directory])
 
 pygame.init()
 programDisplay = pygame.display.set_mode((display_width,display_height))

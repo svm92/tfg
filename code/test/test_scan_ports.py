@@ -17,7 +17,7 @@ def mock_scan(host):
 class Test(unittest.TestCase):
     @patch("nmap.PortScanner.scan", side_effect=mock_scan)
     def test_scan_ports(self, mock_scan):
-        self.assertEqual(webscan.scan_ports("127.0.0.1"), ["http://127.0.0.1:80", "http://127.0.0.1:81", "https://127.0.0.1:443"])
+        self.assertEqual(webscan.scan_ports("127.0.0.1"), ["http://127.0.0.1/", "http://127.0.0.1:81/", "https://127.0.0.1/"])
         self.assertEqual(webscan.scan_ports("127.0.0.2"), [])
         self.assertEqual(webscan.scan_ports("127.0.0.3"), [])
 

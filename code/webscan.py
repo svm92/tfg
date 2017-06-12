@@ -16,14 +16,11 @@ from zapv2 import ZAPv2
 max_children_pages_to_scan = 1  # 0 for all
 owasp_location = "/home/samuel/Escritorio/ZAP_2.5.0/zap.sh"
 book_json_location = "/home/samuel/test-report-skeleton/book.json"
+#owasp_location = "/home/pi/ZAP_2.6.0/zap.sh"
+#book_json_location = "/home/pi/test-report-skeleton/book.json"
 
 # This is the API key for ZAP, found under Tools -> Options -> API. The API key is optional and can be disabled, but it's not recommended since it prevents malicious sites from accessing the ZAP API
 api_key = "3hf8lvqi3dqtau7dab20b292bq"
-
-def add_log_handler(handler, logger, info_level, info_format):
-    handler.setLevel(info_level)
-    handler.setFormatter(logging.Formatter(info_format))
-    logger.addHandler(handler)
 
 def initialize_log_handling():
     logger = logging.getLogger("webscan_logger")
@@ -34,12 +31,17 @@ def initialize_log_handling():
     add_log_handler(logging.FileHandler("webscan.log","w"), logger, logging.DEBUG, "%(asctime)s : [%(levelname)s] - %(message)s")
     return logger
 
+def add_log_handler(handler, logger, info_level, info_format):
+    handler.setLevel(info_level)
+    handler.setFormatter(logging.Formatter(info_format))
+    logger.addHandler(handler)
+
 def find_all_cidrs(): 
     ifaces = netifaces.interfaces() # Get all interfaces
     logger.debug("Interfaces found: " + str(ifaces))
     cidr_list = []
     for i in ifaces:
-        if i == "lo": continue; # Skip the localhost
+        if i == "lo" or i.startswith("eth"): continue; # Skip the localhost and Ethernet
         cidr_list.append(get_cidr(i))
     logger.info("List of CIDRs: " + str(cidr_list))
     return cidr_list
@@ -73,10 +75,10 @@ def scan_hosts(cidr):
     logger.debug("Hosts up: " + str(live_hosts))
     return live_hosts
 
-def find_open_ports(list_of_targets):
+def find_open_ports(list_of_ips):
     list_of_urls = []
-    for i in range(len(list_of_targets)):
-        list_of_urls.extend( scan_ports(list_of_targets[i]) )
+    for ip in list_of_ips:
+        list_of_urls.extend( scan_ports(ip) )
     logger.info("List of URLs with potential web applications: " + str(list_of_urls))
     return list_of_urls
 
@@ -88,12 +90,18 @@ def scan_ports(ip):
     logger.debug("Port scan results for " + str(ip) + ": " + str(scan_results))
     list_of_urls = []
     if "tcp" in scan_results: # If any open ports were found    
-        for port in scan_results["tcp"]: # Get all ports with a http or ssl (https) service
+        for port in scan_results["tcp"]:
             service = scan_results["tcp"][port]["name"]
-            if service in ("http", "ssl", "ssl/http"):
-                list_of_urls.append(find_scheme(service) + ip + ":" + str(port))
+            if service in ("http", "ssl", "ssl/http"): # Get all ports with a http or ssl service
+                list_of_urls.append( get_full_url(service, ip, port) )
     logger.debug("The following URLs were found to potentially have web applications: " + str(list_of_urls))
     return list_of_urls
+
+def get_full_url(service, ip, port):
+    scheme = find_scheme(service)
+    if (scheme == "http://" and port == 80) or (scheme == "https://" and port == 443):
+        return (scheme + ip + "/")
+    return (scheme + ip + ":" + str(port) + "/")
 
 def find_scheme(service):
     if service == "https" or service == "ssl" or service == "ssl/http":
@@ -101,6 +109,10 @@ def find_scheme(service):
     else:
         return "http://"
 
+def check_list_of_urls_not_empty(list_of_urls):
+    if not list_of_urls: # If it's empty, end the program
+        logger.warning("No ports with web applications could be found")
+        raise SystemExit
 
 class OWASP(object):
     def __enter__(self):
@@ -111,7 +123,6 @@ class OWASP(object):
         self.zap = ZAPv2(apikey=api_key) # Start the ZAP API client (with default port 8080)
         return self
 
-    # Tries to close OWASP ZAP and then ends the script's execution
     def __exit__(self, type, value, traceback):
         logger.info("Closing OWASP ZAP")
         self.zap.core.shutdown()
@@ -252,8 +263,9 @@ if __name__ != "__main__":
 if __name__ == "__main__":
     logger = initialize_log_handling()
     cidr_list = find_all_cidrs()
-    list_of_targets = find_live_hosts(cidr_list)
-    list_of_urls = find_open_ports(list_of_targets)
+    list_of_ips = find_live_hosts(cidr_list)
+    list_of_urls = find_open_ports(list_of_ips)
+    check_list_of_urls_not_empty(list_of_urls)
     with OWASP() as owasp_instance:
         owasp_instance.scan(list_of_urls)
         generate_report(owasp_instance.results(), owasp_instance.version())
