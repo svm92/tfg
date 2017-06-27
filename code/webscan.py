@@ -13,8 +13,8 @@ import json
 import nmap
 from zapv2 import ZAPv2
 
-max_children_pages_to_scan = 1  # 0 for all
-owasp_location = "/home/samuel/Escritorio/ZAP_2.5.0/zap.sh"
+max_children_pages_to_scan = 1 # 0 for all
+owasp_location = "/home/samuel/Escritorio/ZAP_2.6.0/zap.sh"
 book_json_location = "/home/samuel/test-report-skeleton/book.json"
 #owasp_location = "/home/pi/ZAP_2.6.0/zap.sh"
 #book_json_location = "/home/pi/test-report-skeleton/book.json"
@@ -41,8 +41,11 @@ def find_all_cidrs():
     logger.debug("Interfaces found: " + str(ifaces))
     cidr_list = []
     for i in ifaces:
-        if i == "lo" or i.startswith("eth"): continue; # Skip the localhost and Ethernet
-        cidr_list.append(get_cidr(i))
+        if i == "lo": continue; # Skip the localhost
+        try:
+            cidr_list.append(get_cidr(i))
+        except Exception:
+            pass
     logger.info("List of CIDRs: " + str(cidr_list))
     return cidr_list
 
@@ -245,15 +248,15 @@ def dump_variables(vars):
     #        "variable_3": "Value 3"
     #    }
     #}
-    logger.debug("Sending variables to book.json file")
+    logger.info("Sending variables to book.json file")
     book_json_vars = { "variables": vars }
     with open(book_json_location, "w") as outfile:
         json.dump(book_json_vars, outfile)
 
 def create_pdf():
-    logger.debug("Creating pdf file")
+    logger.info("Creating pdf file")
     os.chdir(os.path.dirname(book_json_location))
-    os.system('gitbook pdf . scan_report.pdf')
+    os.system('gitbook pdf . scan_report.pdf --log disabled')
 
 
 # Empty logger (no logging) when called from outside, such as from a test

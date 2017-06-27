@@ -7,13 +7,15 @@ sys.path.insert(0, '..')
 import webscan
 
 def mock_interfaces():
-    return ['loc', 'enp0s3']
+    return ['loc', 'eth0', 'enp0s3']
 
 def mock_cidr(x):
     if x == 'loc':
         return '127.0.0.1/8'
     if x == 'enp0s3':
         return '10.0.2.15/24'
+    if x == 'eth0':
+        raise Exception
 
 class Test(unittest.TestCase):   
     @patch("netifaces.interfaces", side_effect=mock_interfaces)
